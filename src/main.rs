@@ -14,6 +14,7 @@ use midir::MidiOutput;
 
 use std::collections::HashMap;
 
+// ------------------------------------------------------------------------------------------------
 /*
 pub struct input_event {
     pub time: ::libc::timeval,
@@ -33,12 +34,16 @@ struct MIDIMessage {
     state: NoteType
 }
 
+// ------------------------------------------------------------------------------------------------
+
 fn main() {
     match run() {
         Ok(_) => (),
         Err(err) => println!("Error: {}", err.description())
     }
 }
+
+// ------------------------------------------------------------------------------------------------
 
 fn run() -> Result<(), Box<Error>> {
     let mut args = std::env::args_os();
@@ -62,15 +67,16 @@ fn run() -> Result<(), Box<Error>> {
         device = devices.swap_remove(chosen.trim().parse::<usize>().unwrap());
     }
 
-    print!("Press q to quit!");
+    println!("Press q to quit!");
 
     // Worker thread: poll input events and send corresponding MIDI message
     let spinlock_clone = spinlock.clone();
     let child = thread::spawn(move || {
 
         let mapping = create_mapping();
+        let mut midi_msg: [u8; 3] = [0, 0, 0];
 
-        let midi_out = match MidiOutput::new("windshrimp") {
+        let midi_out = match MidiOutput::new("honeycomb") {
             Ok(midi_out) => midi_out,
             Err(err) => {
                 println!("{:?}", err);
@@ -78,7 +84,7 @@ fn run() -> Result<(), Box<Error>> {
             },
         };
 
-        let mut conn_out = match midi_out.connect(0, "MIDI Out 0") {
+        let mut conn_out = match midi_out.connect(0, "TRAKTOR Kontrol X1") {
             Ok(conn_out) => conn_out,
             Err(err) => {
                 println!("{:?}", err);
@@ -88,42 +94,44 @@ fn run() -> Result<(), Box<Error>> {
 
         loop {
             if spinlock_clone.load(Ordering::SeqCst) {
-                for ev in device.events_no_sync().unwrap() {
 
-                    if ev.code == 0 {
-                        break;
-                    }
+                // Get all new input events and filter out the ones with type 0.
+                // The filter can be seen as a workaround because the root cause of these 'false'
+                // events has to be found.
+                for ev in device.events_no_sync().unwrap().filter(|ev| ev._type != 0) {
 
-                    let midi_msg: [u8; 3] = match ev_to_midi(&mapping, &ev) {
-                        Some(midi_msg) => midi_msg,
-                        None => {
-                            println!("Could not convert event. {:?}", ev);
+                    // Convert input event to MIDI byte array and try to send it.
+                    match event_to_midi(&mapping, &ev, &mut midi_msg) {
+                        Ok(()) => {
+                            match conn_out.send(&midi_msg) {
+                                Ok(()) => {},
+                                Err(err) => {
+                                    println!("Could not send MIDI message. {:?}", err);
+                                    break;
+                                }
+                            }
+                        },
+                        Err(err) => {
+                            println!("Could not convert event. {:?}! Event: {:?}", err, ev);
                             break;
                         },
                     };
 
-                    println!("Converted event [code: {:?}, type: {:?}, value: {:?}] to \
-                                         MIDI [command: {:?}, byte 1: {:?}, byte 2: {:?}]",
-                                         ev.code, ev._type, ev.value,
-                                         midi_msg[0], midi_msg[1], midi_msg[2]);
+                    // println!("Converted event [code: {:?}, type: {:?}, value: {:?}] to \
+                    //                      MIDI [command: {:?}, byte 1: {:?}, byte 2: {:?}]",
+                    //                      ev.code, ev._type, ev.value,
+                    //                      midi_msg[0], midi_msg[1], midi_msg[2]);
 
-                    match conn_out.send(&midi_msg) {
-                        Ok(()) => {},
-                        Err(err) => {
-                            println!("{:?}", err);
-                            break;
-                        }
-                    }
                 }
+                thread::sleep(Duration::from_millis(5));
             } else {
                 break;
             }
-            // thread::sleep(Duration::from_millis(50));
         }
         conn_out.close();
     });
 
-    // Main loop: wait for termination by user signal
+    // Main loop: only accept 'q' as user input to terminate correctly
     loop {
         input.clear();
         try!(stdin().read_line(&mut input));
@@ -133,14 +141,21 @@ fn run() -> Result<(), Box<Error>> {
             break;
         }
     }
-    let res = child.join();
+
+    child.join();
 
     Ok(())
+
+    // match child.join() {
+    //     Ok(()) => Ok(()),
+    //     Err(err) => Err(Box::new("err"))
+    // }
 }
 
-fn ev_to_midi(mapping: &HashMap<u16, u8>, event: &ioctl::input_event) -> Option<[u8; 3]> {
+// ------------------------------------------------------------------------------------------------
 
-    let mut midi_msg: [u8; 3] = [0, 0, 0];
+fn event_to_midi(mapping: &HashMap<u16, u8>, event: &ioctl::input_event,
+    midi_msg: &mut [u8; 3]) -> Result<(), &'static str> {
 
     midi_msg[0] = match event._type {
         1 =>  match event.value {
@@ -148,12 +163,12 @@ fn ev_to_midi(mapping: &HashMap<u16, u8>, event: &ioctl::input_event) -> Option<
             _ => 144,
         },
         3 => 176,
-        _ => return None
+        _ => return Err("Invalid event type.")
     };
 
     midi_msg[1] = match mapping.get(&event.code) {
         Some(byte_2) => *byte_2,
-        None => return None
+        None => return Err("Invalid event code.")
     };
 
     midi_msg[2] = match event._type {
@@ -162,11 +177,12 @@ fn ev_to_midi(mapping: &HashMap<u16, u8>, event: &ioctl::input_event) -> Option<
             _ => 127,
         },
         3 => convert_range_value(event.value as f32),
-        _ => return None
+        _ => return Err("Invalid event value.")
     };
-
-    Some(midi_msg)
+    Ok(())
 }
+
+// ------------------------------------------------------------------------------------------------
 
 fn convert_range_value(value: f32) -> u8 {
 
@@ -175,6 +191,8 @@ fn convert_range_value(value: f32) -> u8 {
 
     return output as u8;
 }
+
+// ------------------------------------------------------------------------------------------------
 
 fn create_mapping() -> HashMap<u16, u8> {
 
