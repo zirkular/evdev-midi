@@ -2,37 +2,18 @@ extern crate evdev;
 extern crate midir;
 extern crate ioctl;
 
-use std::io::{stdin, Write};
+use std::io::{stdin};
 use std::error::Error;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::thread;
 use std::time::Duration;
 
-use ioctl::input_event;
 use midir::MidiOutput;
 
 use std::collections::HashMap;
 
-// ------------------------------------------------------------------------------------------------
-/*
-pub struct input_event {
-    pub time: ::libc::timeval,
-    pub _type: u16,
-    pub code: u16,
-    pub value: i32,
-}
-*/
-
-enum NoteType {
-    On,
-    Off,
-}
-
-struct MIDIMessage {
-    note: u8,
-    state: NoteType
-}
+mod input;
 
 // ------------------------------------------------------------------------------------------------
 
@@ -46,28 +27,11 @@ fn main() {
 // ------------------------------------------------------------------------------------------------
 
 fn run() -> Result<(), Box<Error>> {
-    let mut args = std::env::args_os();
-    let mut input = String::new();
 
-    let spinlock = Arc::new(AtomicBool::new(true));
+    let mut input   = String::new();
+    let spinlock    = Arc::new(AtomicBool::new(true));
 
-    // evdev
-    let mut device;
-    if args.len() > 1 {
-        device = evdev::Device::open(&args.nth(1).unwrap()).unwrap();
-    } else {
-        let mut devices = evdev::enumerate();
-        for (i, d) in devices.iter().enumerate() {
-            println!("{}: {:?}", i, d.name());
-        }
-        print!("Select the device [0-{}]: ", devices.len());
-        let _ = std::io::stdout().flush();
-        let mut chosen = String::new();
-        std::io::stdin().read_line(&mut chosen).unwrap();
-        device = devices.swap_remove(chosen.trim().parse::<usize>().unwrap());
-    }
-
-    println!("Press q to quit!");
+    let mut device  = input::cli_evdev_select();
 
     // Worker thread: poll input events and send corresponding MIDI message
     let spinlock_clone = spinlock.clone();
@@ -92,12 +56,14 @@ fn run() -> Result<(), Box<Error>> {
             },
         };
 
+        println!("Polling new events. Press q to quit!");
+
         loop {
             if spinlock_clone.load(Ordering::SeqCst) {
 
                 // Get all new input events and filter out the ones with type 0.
                 // The filter can be seen as a workaround because the root cause of these 'false'
-                // events has to be found.
+                // events has to be found in the evdev.
                 for ev in device.events_no_sync().unwrap().filter(|ev| ev._type != 0) {
 
                     // Convert input event to MIDI byte array and try to send it.
@@ -145,11 +111,6 @@ fn run() -> Result<(), Box<Error>> {
     child.join();
 
     Ok(())
-
-    // match child.join() {
-    //     Ok(()) => Ok(()),
-    //     Err(err) => Err(Box::new("err"))
-    // }
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -260,8 +221,6 @@ fn create_mapping() -> HashMap<u16, u8> {
     // Shift / Hotcue
     mapping.insert(295, 45);
     mapping.insert(292, 46);
-
-
 
     return mapping;
 }
