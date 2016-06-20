@@ -4,8 +4,9 @@ extern crate ioctl;
 
 use std;
 use std::io::Write;
+use std::env::ArgsOs;
 
-pub fn cli_evdev_select() -> evdev::Device {
+pub fn parse_args(args: ArgsOs) -> evdev::Device {
     let mut devices = evdev::enumerate();
     for (i, d) in devices.iter().enumerate() {
         println!("{}: {:?}", i, d.name());
