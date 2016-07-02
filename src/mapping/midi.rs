@@ -16,9 +16,9 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
+ 
 extern crate midir;
 
-use std::path::Path;
 use midir::{MidiOutput, MidiOutputConnection, InitError, SendError};
 
 pub struct Transmitter {
@@ -35,7 +35,7 @@ impl Transmitter {
             },
         };
 
-        let mut conn_out = match midi_out.connect(0, "TRAKTOR Kontrol X1") {
+        let conn_out = match midi_out.connect(0, "TRAKTOR Kontrol X1") {
             Ok(conn_out) => conn_out,
             Err(err) => {
                 println!("{:?}", err);
@@ -49,9 +49,3 @@ impl Transmitter {
         return self.out.send(midi_msg);
     }
 }
-
-// impl Drop for Transmitter {
-//     fn drop(&mut self) {
-//         self.out.close();
-//     }
-// }

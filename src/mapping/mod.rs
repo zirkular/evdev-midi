@@ -26,10 +26,8 @@ use std::collections::HashMap;
 use std::path::Path;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::{thread, option};
+use std::thread;
 use std::time::Duration;
-
-use midir::{MidiOutput, MidiOutputConnection, InitError, SendError};
 
 mod midi;
 
@@ -60,7 +58,7 @@ impl Converter {
             };
 
             let mapping = create();
-            let mut midi_msg: [u8; 3] = [0, 0, 0];
+            let mut message: [u8; 3] = [0, 0, 0];
 
             println!("Polling new events. Press q to quit!");
 
@@ -70,37 +68,18 @@ impl Converter {
                     // Get all new input events and filter out the ones with type 0.
                     // The filter can be seen as a workaround because the root cause of these 'false'
                     // events has to be found in the evdev.
-                    for ev in device.events_no_sync().unwrap().filter(|ev| ev._type != 0) {
-                        // let shared_transmitter = transmitter.clone();
+                    for event in device.events_no_sync().unwrap().filter(|event| event._type != 0) {
 
-                        // Convert input event to MIDI byte array and try to send it.
-                        // Rust feature: Be explicit about mutability :)
-                        match event_to_midi(&mapping, &ev, &mut midi_msg) {
-                            Ok(()) => {
-                                match Arc::get_mut(&mut transmitter) {
-                                    Some(transmitter) => match transmitter.send(&midi_msg) {
-                                        Ok(()) => (),
-                                        Err(err) => {
-                                            println!("Could not send event. {:?}! Event: {:?}", err, ev);
-                                            break;
-                                        },
-                                    },
-                                    None => {
-                                        break;
-                                    }
-                                }
+                        match event_to_midi(&mapping, &event, &mut message) {
+                            Ok(()) => match Arc::get_mut(&mut transmitter) {
+                                Some(transmitter) => match transmitter.send(&message) {
+                                    Ok(_) => (),
+                                    Err(err) => println!("Could not send event. {:?}! Event: {:?}", err, event),
+                                },
+                                None => println!("Tx has more than one strong and / or weak references"),
                             },
-                            Err(err) => {
-                                println!("Could not convert event. {:?}! Event: {:?}", err, ev);
-                                break;
-                            },
+                            Err(err) => println!("Could not convert event. {:?}! Event: {:?}", err, event),
                         };
-
-                        // println!("Converted event [code: {:?}, type: {:?}, value: {:?}] to \
-                        //                      MIDI [command: {:?}, byte 1: {:?}, byte 2: {:?}]",
-                        //                      ev.code, ev._type, ev.value,
-                        //                      midi_msg[0], midi_msg[1], midi_msg[2]);
-
                     }
                     thread::sleep(Duration::from_millis(5));
                 } else {
@@ -115,8 +94,8 @@ impl Converter {
         self.running.store(false, Ordering::SeqCst);
 
         match self.worker.unwrap().join() {
-            Ok(ok) => (),
-            Err(err) => println!("Failed joining worker thread."),
+            Ok(_) => (),
+            Err(err) => println!("Failed to join worker thread: {:?}!", err),
         }
     }
 }

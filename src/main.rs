@@ -21,13 +21,9 @@ extern crate evdev;
 extern crate midir;
 extern crate ioctl;
 
-
 use std::error::Error;
 use std::io::{stdin};
 use std::path::Path;
-use std::sync::Arc;
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::thread;
 
 mod mapping;
 
@@ -74,6 +70,5 @@ fn run(path: &AsRef<Path>) -> Result<(), Box<Error>> {
             break;
         }
     }
-
     Ok(())
 }
