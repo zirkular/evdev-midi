@@ -1,6 +1,6 @@
 # honeycomb
 
-honeycomb converts linux input events to MIDI. It's used to create mappings for external-non HID devices, like the TRAKTOR Kontrol X1 Mk1 made by Native Instruments.
+honeycomb converts linux input events to MIDI. It's used to create mappings for external-non HID devices, like DJ Controllers and DIY machinery.
 
 ## Getting Started
 
