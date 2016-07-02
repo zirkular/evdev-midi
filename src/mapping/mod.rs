@@ -23,10 +23,105 @@ extern crate ioctl;
 
 use std;
 use std::collections::HashMap;
+use std::path::Path;
+use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::{thread, option};
+use std::time::Duration;
 
-// ------------------------------------------------------------------------------------------------
+use midir::{MidiOutput, MidiOutputConnection, InitError, SendError};
 
-pub fn event_to_midi(mapping: &HashMap<u16, u8>, event: &ioctl::input_event,
+mod midi;
+
+pub struct Converter {
+    running:    std::sync::Arc<AtomicBool>,
+    worker:     Option<std::thread::JoinHandle<std::result::Result<(), midir::InitError>>>
+}
+
+impl Converter {
+    pub fn new() -> Converter {
+        return Converter { running: Arc::new(AtomicBool::new(true)), worker: None };
+    }
+
+    pub fn start(&mut self, path: &AsRef<Path>) {
+
+        let mut device      = evdev::Device::open(&path).unwrap();
+        let running_clone   = self.running.clone();
+
+        // Spawn thread which polls input events, converts and sends them via MIDI
+        self.worker = Some(thread::spawn(move || {
+
+            let mut transmitter  = match midi::Transmitter::new() {
+                Ok(tx) => Arc::new(tx),
+                Err(err) => {
+                    println!("Could not create MIDI transmitter: {:?}", err);
+                    return Err(err)
+                },
+            };
+
+            let mapping = create();
+            let mut midi_msg: [u8; 3] = [0, 0, 0];
+
+            println!("Polling new events. Press q to quit!");
+
+            loop {
+                if running_clone.load(Ordering::SeqCst) {
+
+                    // Get all new input events and filter out the ones with type 0.
+                    // The filter can be seen as a workaround because the root cause of these 'false'
+                    // events has to be found in the evdev.
+                    for ev in device.events_no_sync().unwrap().filter(|ev| ev._type != 0) {
+                        // let shared_transmitter = transmitter.clone();
+
+                        // Convert input event to MIDI byte array and try to send it.
+                        // Rust feature: Be explicit about mutability :)
+                        match event_to_midi(&mapping, &ev, &mut midi_msg) {
+                            Ok(()) => {
+                                match Arc::get_mut(&mut transmitter) {
+                                    Some(transmitter) => match transmitter.send(&midi_msg) {
+                                        Ok(()) => (),
+                                        Err(err) => {
+                                            println!("Could not send event. {:?}! Event: {:?}", err, ev);
+                                            break;
+                                        },
+                                    },
+                                    None => {
+                                        break;
+                                    }
+                                }
+                            },
+                            Err(err) => {
+                                println!("Could not convert event. {:?}! Event: {:?}", err, ev);
+                                break;
+                            },
+                        };
+
+                        // println!("Converted event [code: {:?}, type: {:?}, value: {:?}] to \
+                        //                      MIDI [command: {:?}, byte 1: {:?}, byte 2: {:?}]",
+                        //                      ev.code, ev._type, ev.value,
+                        //                      midi_msg[0], midi_msg[1], midi_msg[2]);
+
+                    }
+                    thread::sleep(Duration::from_millis(5));
+                } else {
+                    break;
+                }
+            }
+            Ok(())
+        }));
+    }
+
+    pub fn stop(self) {
+        self.running.store(false, Ordering::SeqCst);
+
+        match self.worker.unwrap().join() {
+            Ok(ok) => (),
+            Err(err) => println!("Failed joining worker thread."),
+        }
+    }
+}
+
+fn event_to_midi(mapping: &HashMap<u16, u8>, event: &ioctl::input_event,
     midi_msg: &mut [u8; 3]) -> Result<(), &'static str> {
 
     midi_msg[0] = match event._type {
@@ -54,8 +149,6 @@ pub fn event_to_midi(mapping: &HashMap<u16, u8>, event: &ioctl::input_event,
     Ok(())
 }
 
-// ------------------------------------------------------------------------------------------------
-
 fn convert_range_value(value: f32) -> u8 {
 
     let slope = (127_f32 - 0_f32) / (4095_f32 - 0_f32);
@@ -64,9 +157,7 @@ fn convert_range_value(value: f32) -> u8 {
     return output as u8;
 }
 
-// ------------------------------------------------------------------------------------------------
-
-pub fn create() -> HashMap<u16, u8> {
+fn create() -> HashMap<u16, u8> {
 
     let mut mapping = HashMap::new();
 

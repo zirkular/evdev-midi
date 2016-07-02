@@ -21,24 +21,22 @@ extern crate evdev;
 extern crate midir;
 extern crate ioctl;
 
-use std::io::{stdin};
+
 use std::error::Error;
+use std::io::{stdin};
+use std::path::Path;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::thread;
-use std::time::Duration;
-use std::path::Path;
-
-use midir::MidiOutput;
 
 mod mapping;
-
-// ------------------------------------------------------------------------------------------------
 
 fn main() {
 
     let mut args = std::env::args_os();
 
+    // Check command line arguments. The first argument is the binary itself, so the 1st arguemnt
+    // is the path we're lokking for: E.g. /dev/input/event*
     match args.len() {
         1 => {
             println!("No argument provided. Need at least path to device. (/dev/input/event*)");
@@ -57,79 +55,13 @@ fn main() {
     }
 }
 
-// ------------------------------------------------------------------------------------------------
-
 fn run(path: &AsRef<Path>) -> Result<(), Box<Error>> {
 
-    let spinlock    = Arc::new(AtomicBool::new(true));
     let mut input   = String::new();
+    let mut converter   = mapping::Converter::new();
 
-    let mut device = evdev::Device::open(&path).unwrap();
-
-    // Worker thread: poll input events and send corresponding MIDI message
-    let spinlock_clone = spinlock.clone();
-    let child = thread::spawn(move || {
-
-        let mapping = mapping::create();
-        let mut midi_msg: [u8; 3] = [0, 0, 0];
-
-        let midi_out = match MidiOutput::new("honeycomb") {
-            Ok(midi_out) => midi_out,
-            Err(err) => {
-                println!("{:?}", err);
-                return;
-            },
-        };
-
-        let mut conn_out = match midi_out.connect(0, "TRAKTOR Kontrol X1") {
-            Ok(conn_out) => conn_out,
-            Err(err) => {
-                println!("{:?}", err);
-                return;
-            },
-        };
-
-        println!("Polling new events. Press q to quit!");
-
-        loop {
-            if spinlock_clone.load(Ordering::SeqCst) {
-
-                // Get all new input events and filter out the ones with type 0.
-                // The filter can be seen as a workaround because the root cause of these 'false'
-                // events has to be found in the evdev.
-                for ev in device.events_no_sync().unwrap().filter(|ev| ev._type != 0) {
-
-                    // Convert input event to MIDI byte array and try to send it.
-                    // Rust feature: Be explicit about mutability :)
-                    match mapping::event_to_midi(&mapping, &ev, &mut midi_msg) {
-                        Ok(()) => {
-                            match conn_out.send(&midi_msg) {
-                                Ok(()) => {},
-                                Err(err) => {
-                                    println!("Could not send MIDI message. {:?}", err);
-                                    break;
-                                }
-                            }
-                        },
-                        Err(err) => {
-                            println!("Could not convert event. {:?}! Event: {:?}", err, ev);
-                            break;
-                        },
-                    };
-
-                    // println!("Converted event [code: {:?}, type: {:?}, value: {:?}] to \
-                    //                      MIDI [command: {:?}, byte 1: {:?}, byte 2: {:?}]",
-                    //                      ev.code, ev._type, ev.value,
-                    //                      midi_msg[0], midi_msg[1], midi_msg[2]);
-
-                }
-                thread::sleep(Duration::from_millis(5));
-            } else {
-                break;
-            }
-        }
-        conn_out.close();
-    });
+    // Start the conversion thread which reads input events and send MIDI messages
+    converter.start(path);
 
     // Main loop: only accept 'q' as user input to terminate correctly
     loop {
@@ -137,12 +69,11 @@ fn run(path: &AsRef<Path>) -> Result<(), Box<Error>> {
         try!(stdin().read_line(&mut input));
         if input.trim() == "q" {
             println!("{:?}", "wtf");
-            spinlock.store(false, Ordering::SeqCst);
+
+            converter.stop();
             break;
         }
     }
-
-    child.join();
 
     Ok(())
 }
