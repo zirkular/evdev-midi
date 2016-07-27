@@ -56,7 +56,7 @@ fn run(path: &AsRef<Path>) -> Result<(), Box<Error>> {
     let mut input   = String::new();
     let mut converter   = mapping::Converter::new();
 
-    // Start the conversion thread which reads input events and send MIDI messages
+    // Start the conversion thread which reads input events and sends MIDI messages
     converter.start(path);
 
     // Main loop: only accept 'q' as user input to terminate correctly
