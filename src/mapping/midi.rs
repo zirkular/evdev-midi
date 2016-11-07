@@ -1,5 +1,5 @@
 /**
- * This file is part of honeycomb.
+ * This file is part of evdev-midi.
  *
  * Copyright (C) 2016 by Erik Kundt <bitshift@posteo.org>
  *
@@ -27,7 +27,7 @@ pub struct Transmitter {
 
 impl Transmitter {
     pub fn new() -> Result<Self, InitError> {
-        let midi_out = match MidiOutput::new("honeycomb") {
+        let midi_out = match MidiOutput::new("evdev-midi") {
             Ok(midi_out) => midi_out,
             Err(err) => {
                 println!("{:?}", err);

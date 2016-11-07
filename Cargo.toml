@@ -1,5 +1,5 @@
 [package]
-name = "honeycomb"
+name = "evdev-midi"
 version = "0.1.0"
 authors = ["bitshift <bitshift@posteo.org>"]
 
