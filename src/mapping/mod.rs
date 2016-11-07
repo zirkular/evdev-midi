@@ -37,7 +37,7 @@ pub struct Converter {
 }
 
 impl Converter {
-    
+
     pub fn new() -> Converter {
         return Converter { running: Arc::new(AtomicBool::new(true)), worker: None };
     }

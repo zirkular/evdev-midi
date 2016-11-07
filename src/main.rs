@@ -31,8 +31,6 @@ fn main() {
 
     let mut args = std::env::args_os();
 
-    // Check command line arguments. The first argument is the binary itself, so the 1st arguemnt
-    // is the path we're lokking for: E.g. /dev/input/event*
     match args.len() {
         1 => {
             println!("No argument provided. Need at least path to device. (/dev/input/event*)");
@@ -53,13 +51,11 @@ fn main() {
 
 fn run(path: &AsRef<Path>) -> Result<(), Box<Error>> {
 
-    let mut input   = String::new();
-    let mut converter   = mapping::Converter::new();
+    let mut input = String::new();
+    let mut converter = mapping::Converter::new();
 
-    // Start the conversion thread which reads input events and sends MIDI messages
     converter.start(path);
 
-    // Main loop: only accept 'q' as user input to terminate correctly
     loop {
         input.clear();
         try!(stdin().read_line(&mut input));
