@@ -31,6 +31,9 @@ use std::time::Duration;
 
 mod midi;
 
+const EV_BUTTON: u16    = 1;
+const EV_ROTARY: u16    = 3;
+
 pub struct Converter {
     running:    std::sync::Arc<AtomicBool>,
     worker:     Option<std::thread::JoinHandle<std::result::Result<(), midir::InitError>>>
@@ -105,11 +108,11 @@ fn event_to_midi(mapping: &HashMap<u16, u8>, event: &ioctl::input_event,
     midi_msg: &mut [u8; 3]) -> Result<(), &'static str> {
 
     midi_msg[0] = match event._type {
-        1 =>  match event.value {
-            0 => 128,
-            _ => 144,
+        EV_BUTTON =>  match event.value {
+            0 => midi::COMMAND_NOTE_OFF,
+            _ => midi::COMMAND_NOTE_ON,
         },
-        3 => 176,
+        EV_ROTARY => midi::COMMAND_CC,
         _ => return Err("Invalid event type.")
     };
 
@@ -119,11 +122,11 @@ fn event_to_midi(mapping: &HashMap<u16, u8>, event: &ioctl::input_event,
     };
 
     midi_msg[2] = match event._type {
-        1 => match event.value {
-            0 => 0,
-            _ => 127,
+        EV_BUTTON => match event.value {
+            0 => midi::VELOCITY_MIN,
+            _ => midi::VELOCITY_MAX,
         },
-        3 => convert_range_value(event.value as f32),
+        EV_ROTARY => convert_range_value(event.value as f32),
         _ => return Err("Invalid event value.")
     };
     Ok(())

@@ -21,6 +21,13 @@ extern crate midir;
 
 use midir::{MidiOutput, MidiOutputConnection, InitError, SendError};
 
+pub const COMMAND_NOTE_OFF: u8  = 128;
+pub const COMMAND_NOTE_ON: u8   = 144;
+pub const COMMAND_CC: u8        = 176;
+
+pub const VELOCITY_MIN: u8       = 0;
+pub const VELOCITY_MAX: u8       = 127;
+
 pub struct Transmitter {
     pub out: MidiOutputConnection,
 }
