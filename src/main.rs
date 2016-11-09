@@ -29,40 +29,33 @@ use std::path::Path;
 mod core;
 
 fn main() {
-
     let mut args = std::env::args_os();
 
     match args.len() {
-        1 => {
-            println!("No argument provided. Need at least path to device. (/dev/input/event*)");
-            return;
-        },
-        2 => {
-            match run(&args.nth(1).unwrap()) {
+        3 => {
+            match run(&args.nth(1).unwrap(), &args.nth(2).unwrap()) {
                 Ok(_) => (),
                 Err(err) => println!("Error: {}", err.description())
             }
         },
         _ => {
-            println!("Too many arguments provided.");
+            println!("Wrong number of arguments provided. Example usage: evdev-midi /dev/input/event1 mapping.json");
             return;
         }
     }
 }
 
-fn run(path: &AsRef<Path>) -> Result<(), Box<Error>> {
-
+fn run(device_path: &AsRef<Path>, mapping_path: &AsRef<Path>) -> Result<(), Box<Error>> {
     let mut input = String::new();
     let mut converter = core::Converter::new();
 
-    converter.start(path);
-
+    converter.start(device_path, mapping_path);
+    
     loop {
         input.clear();
         try!(stdin().read_line(&mut input));
         if input.trim() == "q" {
             println!("{:?}", "wtf");
-
             converter.stop();
             break;
         }
