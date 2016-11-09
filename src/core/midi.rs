@@ -34,22 +34,10 @@ pub struct Transmitter {
 
 impl Transmitter {
     pub fn new(name: &String) -> Result<Self, InitError> {
-        let midi_out = match MidiOutput::new("evdev-midi") {
-            Ok(midi_out) => midi_out,
-            Err(err) => {
-                println!("{:?}", err);
-                return Err(InitError);
-            },
-        };
+        let midi_out = MidiOutput::new("evdev-midi").unwrap();
+        let conn_out = midi_out.connect(0, name).unwrap();
 
-        let conn_out = match midi_out.connect(0, name) {
-            Ok(conn_out) => conn_out,
-            Err(err) => {
-                println!("{:?}", err);
-                return Err(InitError);
-            },
-        };
-        return Ok(Transmitter { out: conn_out });
+        Ok(Transmitter { out: conn_out })
     }
 
     pub fn send(&mut self, midi_msg: &[u8; 3]) -> Result<(), SendError> {
