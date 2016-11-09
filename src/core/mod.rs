@@ -30,13 +30,14 @@ use std::thread;
 use std::time::Duration;
 
 mod midi;
+mod mapping;
 
 const EV_BUTTON: u16    = 1;
 const EV_ROTARY: u16    = 3;
 
 pub struct Converter {
-    running:    std::sync::Arc<AtomicBool>,
-    worker:     Option<std::thread::JoinHandle<std::result::Result<(), midir::InitError>>>
+    running:        std::sync::Arc<AtomicBool>,
+    worker:         Option<std::thread::JoinHandle<std::result::Result<(), midir::InitError>>>
 }
 
 impl Converter {
@@ -52,8 +53,8 @@ impl Converter {
 
         // Spawn thread which polls input events, converts and sends them via MIDI
         self.worker = Some(thread::spawn(move || {
-
-            let mut transmitter  = match midi::Transmitter::new() {
+            
+            let mut transmitter  = match midi::Transmitter::new(&String::from("evdev-midi-controller")) {
                 Ok(tx) => Arc::new(tx),
                 Err(err) => {
                     println!("Could not create MIDI transmitter: {:?}", err);
@@ -143,6 +144,7 @@ fn convert_range_value(value: f32) -> u8 {
 fn create() -> HashMap<u16, u8> {
 
     let mut mapping = HashMap::new();
+    // storage::save(&map, &String::from("traktor_kontrol_x1.json"));
 
     // Creates mapping for notes, cc's
 

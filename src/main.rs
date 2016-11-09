@@ -20,12 +20,13 @@
 extern crate evdev;
 extern crate midir;
 extern crate ioctl;
+extern crate rustc_serialize;
 
 use std::error::Error;
 use std::io::{stdin};
 use std::path::Path;
 
-mod mapping;
+mod core;
 
 fn main() {
 
@@ -52,7 +53,7 @@ fn main() {
 fn run(path: &AsRef<Path>) -> Result<(), Box<Error>> {
 
     let mut input = String::new();
-    let mut converter = mapping::Converter::new();
+    let mut converter = core::Converter::new();
 
     converter.start(path);
 

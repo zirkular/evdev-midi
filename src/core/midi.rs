@@ -16,7 +16,7 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
- 
+
 extern crate midir;
 
 use midir::{MidiOutput, MidiOutputConnection, InitError, SendError};
@@ -33,7 +33,7 @@ pub struct Transmitter {
 }
 
 impl Transmitter {
-    pub fn new() -> Result<Self, InitError> {
+    pub fn new(name: &String) -> Result<Self, InitError> {
         let midi_out = match MidiOutput::new("evdev-midi") {
             Ok(midi_out) => midi_out,
             Err(err) => {
@@ -42,7 +42,7 @@ impl Transmitter {
             },
         };
 
-        let conn_out = match midi_out.connect(0, "TRAKTOR Kontrol X1") {
+        let conn_out = match midi_out.connect(0, name) {
             Ok(conn_out) => conn_out,
             Err(err) => {
                 println!("{:?}", err);

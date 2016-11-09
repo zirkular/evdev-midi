@@ -6,6 +6,7 @@ authors = ["bitshift <bitshift@posteo.org>"]
 [dependencies]
 # evdev = "0.9.2"
 evdev = { git = "https://github.com/bit-shift/evdev" }
+rustc-serialize = "0.3.19"
 midir = "0.2.0"
 ioctl = "0.3.3"
 bitflags = "*"
