@@ -33,7 +33,7 @@ fn main() {
 
     match args.len() {
         3 => {
-            match run(&args.nth(1).unwrap(), &args.nth(2).unwrap()) {
+            match run(&args.nth(1).unwrap(), &args.nth(0).unwrap()) {
                 Ok(_) => (),
                 Err(err) => println!("Error: {}", err.description())
             }
@@ -50,7 +50,7 @@ fn run(device_path: &AsRef<Path>, mapping_path: &AsRef<Path>) -> Result<(), Box<
     let mut converter = core::Converter::new();
 
     converter.start(device_path, mapping_path);
-    
+
     loop {
         input.clear();
         try!(stdin().read_line(&mut input));
