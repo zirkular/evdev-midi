@@ -46,19 +46,26 @@ fn main() {
 }
 
 fn run(device_path: &AsRef<Path>, mapping_path: &AsRef<Path>) -> Result<(), Box<Error>> {
-    let mut input = String::new();
-    let mut converter = core::Converter::new();
+    let mut input       = String::new();
+    let mut converter   = core::Converter::new();
+    let mapping         = core::mapping::load(mapping_path).unwrap();
 
-    converter.start(device_path, mapping_path);
+    println!("{:?}", device_path.as_ref());
 
-    loop {
-        input.clear();
-        try!(stdin().read_line(&mut input));
-        if input.trim() == "q" {
-            println!("{:?}", "wtf");
-            converter.stop();
-            break;
+    if let Ok(device) = evdev::Device::open(&device_path) {
+        converter.start(device, mapping);
+        loop {
+            input.clear();
+            try!(stdin().read_line(&mut input));
+            if input.trim() == "q" {
+                println!("{:?}", "wtf");
+                converter.stop();
+                break;
+            }
         }
+    } else {
+        println!("Could not open device!");
     }
+
     Ok(())
 }

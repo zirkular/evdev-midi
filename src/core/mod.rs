@@ -22,14 +22,13 @@ extern crate midir;
 extern crate ioctl;
 
 use std;
-use std::path::Path;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::thread;
 use std::time::Duration;
 
 mod midi;
-mod mapping;
+pub mod mapping;
 mod conversion;
 
 pub struct Converter {
@@ -43,13 +42,11 @@ impl Converter {
         return Converter { running: Arc::new(AtomicBool::new(true)), worker: None };
     }
 
-    pub fn start(&mut self, device_path: &AsRef<Path>, mapping_path: &AsRef<Path>) {
-        let mut device      = evdev::Device::open(&device_path).unwrap();
-        let mapping         = mapping::load(mapping_path).unwrap();
-        let running_clone   = self.running.clone();
+    pub fn start(&mut self, mut device: evdev::Device, mapping: mapping::Mapping) {
+        let running_clone = self.running.clone();
 
         // Spawn thread which polls input events, converts and sends them via MIDI
-        self.worker = Some(thread::spawn(move || {
+        self.worker = Some(thread::spawn(move | | {
             let mut transmitter  = match midi::Transmitter::new(&String::from("evdev-midi-controller")) {
                 Ok(tx) => Arc::new(tx),
                 Err(err) => {

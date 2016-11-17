@@ -57,6 +57,6 @@ fn encode_test() {
 #[test]
 fn load_test() {
     let mapping = load(&Path::new("resources/mappings/test.json")).unwrap();
-
+    
     assert_eq!(mapping.device_name, "Test");
 }

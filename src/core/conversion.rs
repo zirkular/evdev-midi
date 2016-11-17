@@ -52,7 +52,6 @@ pub fn event_to_midi(mapping: &HashMap<u16, u8>, event: &ioctl::input_event,
 }
 
 fn convert_range_value(value: f32) -> u8 {
-
     let slope = (127_f32 - 0_f32) / (4095_f32 - 0_f32);
     let output = 0_f32 + slope * (value - 0_f32);
 
